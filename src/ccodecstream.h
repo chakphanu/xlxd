@@ -30,6 +30,7 @@
 #include <queue>
 #include <chrono>
 #include <unordered_map>
+#include <vector>
 #include "csemaphore.h"
 #include "cudpsocket.h"
 #include "cpacketqueue.h"
@@ -234,6 +235,8 @@ public:
     // initialization
     bool Init(uint16);
     void Close(void);
+    bool SetExtendedOutputs(const std::vector<uint8> &);
+    bool IsExtended(void) const { return !m_ExtendedOutputs.empty(); }
     
     // get
     bool   IsConnected(void) const          { return m_bConnected; }
@@ -292,6 +295,7 @@ protected:
     uint8           m_uiCodecOut1;
     uint8           m_uiCodecOut2;
     uint8           m_uiCodecOut3;
+    std::vector<uint8> m_ExtendedOutputs;
 
     // socket
     CIp             m_Ip;

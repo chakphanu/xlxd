@@ -25,6 +25,22 @@ The sources are published under GPL Licenses.
 
 ---
 
+## PCM transcoder support
+
+PCM transport gives audio integrations access to decoded samples instead of
+digital-radio frames. The transcoder handles conversion between PCM and its
+supported voice codecs, keeping that conversion at a single boundary.
+
+PCM is signed 16-bit little endian at 8000 Hz, with 160 samples per 20 ms
+frame. Capability negotiation lets clients request PCM alongside the digital
+outputs they need. Existing codec IDs, legacy packet forms and default digital
+stream calls remain supported. PCM is not sent over XLX interlinks.
+
+See [PCM format, backend capabilities and setup](docs/pcm-extension.md) for
+usage and supported hardware.
+
+---
+
 ## XLX Interlink Protocol
 
 XLX reflectors can peer with each other to share voice traffic. The interlink protocol has evolved to support multiple codecs:

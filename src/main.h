@@ -207,6 +207,7 @@ static_assert(DSCP_VALUE >= 0 && DSCP_VALUE <= 63,
 #define CODEC_AMBE2PLUS                 2                                   // DMR
 #define CODEC_CODEC2                    3                                   // M17
 #define CODEC_IMBE                      4                                   // P25
+#define CODEC_PCM_S16LE_8K              5
 
 // transcoder packet sizes --------------------------------------
 #define AMBE_FRAME_SIZE                 9                                   // AMBE+/AMBE2+ frame

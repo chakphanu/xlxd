@@ -29,6 +29,7 @@
 #include "csemaphore.h"
 #include "ccodecstream.h"
 #include "cudpsocket.h"
+#include "cpcmpeer.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////
 // define
@@ -61,6 +62,7 @@ public:
     
     // manage streams
     CCodecStream *GetStream(CPacketStream *, uint8);
+    CCodecStream *GetStream(CPacketStream *, uint8, uint32 requestedOutputs);
     void ReleaseStream(CCodecStream *);
     
     // task
@@ -105,6 +107,7 @@ protected:
     // time
     CTimePoint      m_LastKeepaliveTime;
     CTimePoint      m_LastActivityTime;
+    CPcmPeer        m_PcmPeer;
 };
 
 

@@ -70,7 +70,8 @@ bool CAmbeServer::Start(void)
     
     // init interfaces & controller
     std::cout << "Initializing vocodecs:" << std::endl;
-    ok &= g_Vocodecs.Init();
+    if(!g_PcmRuntime.softwareOnly && g_PcmRuntime.serial.empty())
+        ok &= g_Vocodecs.Init();
     std::cout << std::endl;
     std::cout << "Initializing controller" << std::endl;
     ok &= m_Controller.Init();

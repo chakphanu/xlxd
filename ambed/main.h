@@ -73,6 +73,7 @@
 #define CODEC_AMBE2PLUS                 2
 #define CODEC_CODEC2                    3
 #define CODEC_IMBE                      4
+#define CODEC_PCM_S16LE_8K              5
 
 // Frame sizes --------------------------------------------------
 #define AMBE_FRAME_SIZE                 9

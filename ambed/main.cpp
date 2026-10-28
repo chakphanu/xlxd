@@ -29,6 +29,8 @@
 
 #include "syslog.h"
 #include <sys/stat.h>
+#include <cstring>
+
 
 ////////////////////////////////////////////////////////////////////////////////////////
 // global objects
@@ -87,12 +89,26 @@ int main(int argc, const char * argv[])
 #endif
     
     // check arguments
-    if ( argc != 2 )
+    if ( argc < 2 )
     {
         std::cout << "Usage: ambed ip" << std::endl;
         std::cout << "example: ambed 192.168.178.212" << std::endl;
         return 1;
     }
+    for(int i=2;i<argc;++i) {
+        if(std::strcmp(argv[i],"--software-only")==0) g_PcmRuntime.softwareOnly=true;
+        else if(std::strcmp(argv[i],"--device-serial")==0 && i+1<argc) g_PcmRuntime.serial=argv[++i];
+        else if(std::strcmp(argv[i],"--device-profile")==0 && i+1<argc) g_PcmRuntime.profile=argv[++i];
+        else if(std::strcmp(argv[i],"--device-codec")==0 && i+1<argc) {
+            const char *value=argv[++i];
+            if(std::strcmp(value,"1")==0) g_PcmRuntime.codec=1;
+            else if(std::strcmp(value,"2")==0) g_PcmRuntime.codec=2;
+            else return 2;
+        } else return 2;
+    }
+    if(!g_PcmRuntime.serial.empty() && (g_PcmRuntime.softwareOnly ||
+        g_PcmRuntime.profile!="dvstick30" || !g_PcmRuntime.codec)) return 2;
+    if(g_PcmRuntime.serial.empty() && (!g_PcmRuntime.profile.empty() || g_PcmRuntime.codec)) return 2;
     
     // initialize ambeserver
     g_AmbeServer.SetListenIp(CIp(argv[1]));

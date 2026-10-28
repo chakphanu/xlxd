@@ -24,6 +24,8 @@
 
 #ifndef cdvframepacket_h
 #define cdvframepacket_h
+#include <array>
+#include <memory>
 
 #include "cpacket.h"
 
@@ -105,11 +107,14 @@ public:
     bool HasAmbePlusData(void) const        { return m_bHasAmbePlus; }
     bool HasCodec2Data(void) const          { return m_bHasCodec2; }
     bool HasImbeData(void) const            { return m_bHasImbe; }
+    bool HasPcmData(void) const             { return bool(m_Pcm); }
+    const uint8 *GetPcm(void) const         { return m_Pcm ? m_Pcm->data() : NULL; }
 
     // set
     void SetDvData(uint8 *);
     void SetAmbe(uint8, uint8 *);
     void SetCodec2(const uint8 *);
+    bool SetPcm(const uint8 *,size_t length=320);
 
     // Reconcile the four Has-flags to reflect what the source actually
     // provides. mask is a bitmask of (1U << CODEC_*) values from the
@@ -150,6 +155,8 @@ protected:
     // data (p25)
     uint8       m_uiImbe[IMBE_SIZE];
     bool        m_bHasImbe;
+    // Allocated only for PCM-bearing packets; published samples are immutable.
+    std::shared_ptr<const std::array<uint8,320> > m_Pcm;
 };
 
 

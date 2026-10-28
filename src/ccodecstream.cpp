@@ -23,6 +23,7 @@
 // ----------------------------------------------------------------------------
 
 #include "main.h"
+#include "pcm_protocol.h"
 #include <string.h>
 #include <stdio.h>
 #include <vector>
@@ -610,7 +611,16 @@ void CCodecStream::Task(void)
     // regardless of arrival order or interleaved drops.
     if ( m_Socket.Receive(&Buffer, &Ip, 5) != -1 )
     {
-        if ( IsValidAmbePacket(Buffer, Ambe1, Ambe2, Ambe3) )
+        std::vector<std::vector<uint8_t> > extendedFrames;
+        uint8_t extendedPid=0;
+        bool valid=false;
+        if(IsExtended()) {
+            CIp expected=m_Ip;
+            expected.GetSockAddr()->sin_port=htons(m_uiPort);
+            valid=(Ip==expected) && pcmwire::parseReply(Buffer.data(),Buffer.size(),
+                m_ExtendedOutputs.data(),m_ExtendedOutputs.size(),extendedPid,extendedFrames);
+        } else valid=IsValidAmbePacket(Buffer,Ambe1,Ambe2,Ambe3);
+        if ( valid )
         {
             m_TimeoutTimer.Now();
 
@@ -695,11 +705,19 @@ void CCodecStream::Task(void)
                             if ( !Packet->HasImbeData() )
                                 Packet->SetAmbe(codec, data);
                             break;
+                        case CODEC_PCM_S16LE_8K:
+                            if(!Packet->HasPcmData()) Packet->SetPcm(data);
+                            break;
                     }
                 };
-                fillIfMissing(m_uiCodecOut1, Ambe1);
-                fillIfMissing(m_uiCodecOut2, Ambe2);
-                fillIfMissing(m_uiCodecOut3, Ambe3);
+                if(IsExtended()) {
+                    for(size_t i=0;i<m_ExtendedOutputs.size();++i)
+                        fillIfMissing(m_ExtendedOutputs[i],extendedFrames[i].data());
+                } else {
+                    fillIfMissing(m_uiCodecOut1, Ambe1);
+                    fillIfMissing(m_uiCodecOut2, Ambe2);
+                    fillIfMissing(m_uiCodecOut3, Ambe3);
+                }
                 m_PendingTranscode.erase(it);
             }
             else
@@ -1331,6 +1349,10 @@ void CCodecStream::EncodeAmbePacket(CBuffer *Buffer, const uint8 *Ambe)
     {
         Buffer->Append((uint8 *)Ambe, IMBE_SIZE);          // 11 bytes for IMBE
     }
+    else if(m_uiCodecIn==CODEC_PCM_S16LE_8K)
+    {
+        Buffer->Append((uint8 *)Ambe,320);
+    }
     else
     {
         Buffer->Append((uint8 *)Ambe, AMBE_FRAME_SIZE);    // 9 bytes for AMBE
@@ -1338,4 +1360,12 @@ void CCodecStream::EncodeAmbePacket(CBuffer *Buffer, const uint8 *Ambe)
 
     // increment PID for next packet (wraps at 256)
     m_uiPid++;
+}
+
+// Extension metadata is immutable once the stream thread has started.
+bool CCodecStream::SetExtendedOutputs(const std::vector<uint8> &outputs)
+{
+    if(m_pThread || !pcmwire::validOutputs(outputs.data(),outputs.size(),m_uiCodecIn)) return false;
+    m_ExtendedOutputs=outputs;
+    return true;
 }

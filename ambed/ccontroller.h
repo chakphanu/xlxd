@@ -24,6 +24,7 @@
 
 #ifndef ccontroller_h
 #define ccontroller_h
+#include "cpcmstream.h"
 
 #include "ccallsign.h"
 #include "cstream.h"
@@ -77,6 +78,8 @@ protected:
     // codec helpers
     bool IsValidCodecIn(uint8);
     bool IsValidCodecOut(uint8);
+    bool HandleExtended(const CBuffer &,const CIp &);
+    uint16 NextFreeExtendedId();
     
 protected:
     // control socket
@@ -88,6 +91,8 @@ protected:
     uint16                 m_uiMaxStreams;
     std::mutex             m_Mutex;
     std::vector<CStream *> m_Streams;
+    std::vector<std::unique_ptr<CPcmStream> > m_PcmStreams;
+    unsigned m_ExtendedCursor=0;
 
     // thread
     std::atomic<bool> m_bStopThread;

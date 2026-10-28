@@ -121,6 +121,7 @@ void CTranscoder::Close(void)
         m_Streams.clear();
     }
     m_Mutex.unlock();
+    m_PcmPeer.Reset();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -305,6 +306,31 @@ CCodecStream *CTranscoder::GetStream(CPacketStream *PacketStream, uint8 uiCodecI
     return stream;
 }
 
+CCodecStream *CTranscoder::GetStream(CPacketStream *parent,uint8 input,uint32 requestedOutputs)
+{
+    CPcmPeer::Stream descriptor;
+    const std::string server=(const char *)g_Reflector.GetTranscoderIp();
+    const std::string local=(const char *)g_Reflector.GetListenIp();
+    if(!m_PcmPeer.Open(local,server,input,requestedOutputs,descriptor)) {
+        if(input!=CODEC_PCM_S16LE_8K && !m_PcmPeer.SupportsPcm()) return GetStream(parent,input);
+        return NULL;
+    }
+    const std::vector<uint8_t> &outs=descriptor.outputs;
+    CCodecStream *stream=new CCodecStream(parent,descriptor.id,input,outs[0],
+        outs.size()>1 ? outs[1] : 0,outs.size()>2 ? outs[2] : 0);
+    if(!stream->SetExtendedOutputs(outs) || !stream->Init(descriptor.port)) {
+        m_PcmPeer.Close(descriptor.id);
+        delete stream;
+        return NULL;
+    }
+    Lock();m_Streams.push_back(stream);Unlock();
+    uint32 served=0;
+    for(size_t i=0;i<outs.size();++i) served|=1U<<outs[i];
+    const uint32 missing=requestedOutputs & pcmwire::FormatMask & ~(served | (1U<<input));
+    if(missing) std::cout << "PCM stream " << descriptor.id << " unsupported output mask=" << missing << std::endl;
+    return stream;
+}
+
 void CTranscoder::ReleaseStream(CCodecStream *stream)
 {
     CBuffer Buffer;
@@ -321,8 +347,11 @@ void CTranscoder::ReleaseStream(CCodecStream *stream)
                 if ( (m_Streams[i]) ==  stream )
                 {
                     // send close packet
-                    EncodeClosestreamPacket(&Buffer, m_Streams[i]->GetStreamId());
-                    m_Socket.Send(Buffer, m_Ip, TRANSCODER_PORT);
+                    if(m_Streams[i]->IsExtended()) m_PcmPeer.Close(m_Streams[i]->GetStreamId());
+                    else {
+                        EncodeClosestreamPacket(&Buffer, m_Streams[i]->GetStreamId());
+                        m_Socket.Send(Buffer, m_Ip, TRANSCODER_PORT);
+                    }
                     
                     // and close it. Close() sets m_bStopThread on the
                     // codec stream and joins its Task thread. After

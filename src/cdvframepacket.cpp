@@ -196,6 +196,7 @@ CDvFramePacket::CDvFramePacket(const CDvFramePacket &DvFrame)
     m_bHasCodec2 = DvFrame.m_bHasCodec2;
     ::memcpy(m_uiImbe, DvFrame.m_uiImbe, sizeof(m_uiImbe));
     m_bHasImbe = DvFrame.m_bHasImbe;
+    m_Pcm = DvFrame.m_Pcm;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -217,6 +218,7 @@ const uint8 *CDvFramePacket::GetAmbe(uint8 uiCodec) const
         case CODEC_AMBE2PLUS:   return m_uiAmbePlus;
         case CODEC_CODEC2:      return m_uiCodec2;
         case CODEC_IMBE:        return m_uiImbe;
+        case CODEC_PCM_S16LE_8K: return GetPcm();
         default:                return NULL;
     }
 }
@@ -254,6 +256,9 @@ void CDvFramePacket::SetAmbe(uint8 uiCodec, uint8 *Ambe)
             ::memcpy(m_uiImbe, Ambe, sizeof(m_uiImbe));
             m_bHasImbe = true;
             break;
+        case CODEC_PCM_S16LE_8K:
+            SetPcm(Ambe);
+            break;
     }
 }
 
@@ -269,6 +274,16 @@ void CDvFramePacket::ConformAvailableCodecs(uint32 mask)
     m_bHasAmbePlus = (mask & (1U << CODEC_AMBE2PLUS)) != 0U;
     m_bHasCodec2   = (mask & (1U << CODEC_CODEC2))    != 0U;
     m_bHasImbe     = (mask & (1U << CODEC_IMBE))      != 0U;
+    if(!(mask & (1U << CODEC_PCM_S16LE_8K))) m_Pcm.reset();
+}
+
+bool CDvFramePacket::SetPcm(const uint8 *pcm,size_t length)
+{
+    if(!pcm || length!=320) return false;
+    std::shared_ptr<std::array<uint8,320> > next(new std::array<uint8,320>);
+    ::memcpy(next->data(),pcm,320);
+    m_Pcm=next;
+    return true;
 }
 
 
@@ -277,6 +292,8 @@ void CDvFramePacket::ConformAvailableCodecs(uint32 mask)
 
 bool CDvFramePacket::operator ==(const CDvFramePacket &DvFrame) const
 {
+    if(bool(m_Pcm)!=bool(DvFrame.m_Pcm) ||
+        (m_Pcm && *m_Pcm!=*DvFrame.m_Pcm)) return false;
     return ( (::memcmp(m_uiAmbe, DvFrame.m_uiAmbe, sizeof(m_uiAmbe)) == 0) &&
              (::memcmp(m_uiDvData, DvFrame.m_uiDvData, sizeof(m_uiDvData)) == 0) &&
              (m_bHasAmbe == DvFrame.m_bHasAmbe) &&

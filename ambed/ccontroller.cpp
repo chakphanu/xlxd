@@ -103,6 +103,7 @@ void CController::Close(void)
         delete m_Streams[i];
     }
     m_Streams.clear();
+    m_PcmStreams.clear();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -135,7 +136,8 @@ void CController::Task(void)
     if ( m_Socket.Receive(&Buffer, &Ip, 20) != -1 )
     {
         // crack packet
-        if ( IsValidOpenstreamPacket(Buffer, &Callsign, &CodecIn, &CodecOut1, &CodecOut2, &CodecOut3) )
+        if ( HandleExtended(Buffer,Ip) ) {}
+        else if ( IsValidOpenstreamPacket(Buffer, &Callsign, &CodecIn, &CodecOut1, &CodecOut2, &CodecOut3) )
         {
             std::cout << "Stream Open from " << Callsign << " at " << Ip
                       << " CodecIn=" << (int)CodecIn
@@ -174,6 +176,11 @@ void CController::Task(void)
     }
     
     
+    for(auto it=m_PcmStreams.begin();it!=m_PcmStreams.end();) {
+        if(!(*it)->IsActive()) it=m_PcmStreams.erase(it);
+        else ++it;
+    }
+
     // HandleTimout/keepalive
     bool timeout;
     do
@@ -419,5 +426,68 @@ bool CController::IsValidCodecIn(uint8 codec)
 bool CController::IsValidCodecOut(uint8 codec)
 {
     return ((codec == CODEC_AMBEPLUS) || (codec == CODEC_AMBE2PLUS) || (codec == CODEC_CODEC2) || (codec == CODEC_IMBE));
+}
+
+uint16 CController::NextFreeExtendedId()
+{
+    const unsigned base=m_uiMaxStreams;
+    if(base+27U>65535U-TRANSCODER_PORT) return 0;
+    for(unsigned step=0;step<27;++step) {
+        const uint16 id=uint16(base+(m_ExtendedCursor+step)%27U+1U);
+        bool used=false;
+        for(size_t i=0;i<m_PcmStreams.size();++i) used|=m_PcmStreams[i]->Id()==id;
+        if(!used) return id;
+    }
+    return 0;
+}
+
+bool CController::HandleExtended(const CBuffer &buffer,const CIp &peer)
+{
+    std::vector<uint8_t> response;
+    if(buffer.size()==9 && pcmwire::tagged(buffer.data(),buffer.size(),"AMBEDCAPS",9)) {
+        response=pcmwire::encodeCapabilities(pcmwire::FormatMask);
+    } else if(buffer.size()==9 && pcmwire::tagged(buffer.data(),buffer.size(),"AMBEDCS",7)) {
+        uint16_t id=0;
+        std::memcpy(&id,buffer.data()+7,2);
+        for(auto it=m_PcmStreams.begin();it!=m_PcmStreams.end();++it) {
+            if((*it)->Id()!=id) continue;
+            if((*it)->HasOwner(peer)) m_PcmStreams.erase(it);
+            return true;
+        }
+        return false;
+    } else {
+        pcmwire::Open request;
+        if(!pcmwire::parseOpen(buffer.data(),buffer.size(),request)) return false;
+        CCallsign callsign;
+        callsign.SetCallsign(request.callsign.data(),8);
+        if(!callsign.IsValid()) return true;
+        for(size_t i=0;i<m_PcmStreams.size();++i) {
+            if(!m_PcmStreams[i]->SameTransaction(peer,request.transaction)) continue;
+            if(m_PcmStreams[i]->Matches(request)) response=m_PcmStreams[i]->Descriptor();
+            else response=pcmwire::encodeBusy(request.transaction);
+            CBuffer reply;
+            reply.Set(response.data(),response.size());
+            m_Socket.Send(reply,peer);
+            return true;
+        }
+        bool hardware=request.input<=2;
+        for(size_t i=0;i<request.count;++i) hardware|=request.outputs[i]<=2;
+        size_t count=0;
+        for(size_t i=0;i<m_PcmStreams.size();++i)
+            if(m_PcmStreams[i]->IsHardware()==hardware) ++count;
+        const uint16 id=NextFreeExtendedId();
+        std::unique_ptr<CPcmStream> stream;
+        if(id && count<(hardware ? 1U : 26U))
+            stream=CPcmStream::Open(request,id,peer,m_Ip);
+        if(stream) {
+            m_ExtendedCursor=unsigned(id)-m_uiMaxStreams;
+            response=stream->Descriptor();
+            m_PcmStreams.push_back(std::move(stream));
+        } else response=pcmwire::encodeBusy(request.transaction);
+    }
+    CBuffer reply;
+    reply.Set(response.data(),response.size());
+    m_Socket.Send(reply,peer);
+    return true;
 }
 
