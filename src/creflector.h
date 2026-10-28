@@ -65,6 +65,7 @@ public:
     const CIp &GetListenIp(void) const              { return m_Ip; }
     const uint8 *GetListenMac(void) const           { return (const uint8 *)m_Mac; }
     const CIp &GetTranscoderIp(void) const          { return m_AmbedIp; }
+    bool HasPcmModule(char module) const            { return m_Protocols.HasPcmModule(module); }
     
     // operation
     bool Start(void);

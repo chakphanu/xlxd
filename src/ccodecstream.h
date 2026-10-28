@@ -528,6 +528,8 @@ protected:
     // via the asymmetric hysteresis policy. Caller must hold
     // CCodecStream::Lock().
     void RecomputeJitterTarget(void);
+    // Extended device-open backlog, frozen at first playout and capped at 800 ms.
+    size_t m_ExtendedStartupFloor=0;
 };
 
 

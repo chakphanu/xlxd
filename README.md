@@ -21,23 +21,31 @@ The sources are published under GPL Licenses.
 - **XRF**: XRF/DExtra Reflector Peering (peer-only, same AMBE+ codec as D-Star - no transcoding needed)
 - **DCS**: DCS Reflector Peering (peer-only, same AMBE+ codec as D-Star - no transcoding needed)
 - **M17**: Full M17 protocol support with Codec2 software transcoding
+- **USRP (optional)**: Module-bound UDP PCM audio and PTT endpoints for analog front ends
 - **XLX Interlink**: Protocol for linking reflectors (revision 3 with M17 Codec2 support)
 
 ---
 
-## PCM transcoder support
+## PCM and USRP
 
-PCM transport gives audio integrations access to decoded samples instead of
-digital-radio frames. The transcoder handles conversion between PCM and its
-supported voice codecs, keeping that conversion at a single boundary.
+PCM support allows analog audio systems to exchange decoded audio with
+reflector modules. The transcoder converts between PCM and digital voice
+codecs, so the audio front end does not need to generate digital-radio frames
+or run a separate streaming converter.
 
-PCM is signed 16-bit little endian at 8000 Hz, with 160 samples per 20 ms
-frame. Capability negotiation lets clients request PCM alongside the digital
-outputs they need. Existing codec IDs, legacy packet forms and default digital
-stream calls remain supported. PCM is not sent over XLX interlinks.
+USRP carries PCM audio and PTT signaling over UDP. Each configured USRP peer
+maps to one reflector module. An audio front end such as app_rpt handles
+AllStar node links, IAX2 connections and telemetry; XLXD handles module routing
+and the USRP connection.
 
-See [PCM format, backend capabilities and setup](docs/pcm-extension.md) for
-usage and supported hardware.
+PCM uses signed 16-bit little-endian samples at 8000 Hz, with 160 samples per
+20 ms frame. Capabilities are negotiated with the transcoder. Existing digital
+operation remains available, and PCM is not added to the XLX interlink wire.
+USRP endpoints are optional and only configured ports are opened.
+
+See [PCM transcoder support](docs/pcm-extension.md),
+[USRP configuration and PTT behavior](docs/usrp.md), and the
+[endpoint configuration example](config/xlxd.usrp.example) for setup and limitations.
 
 ---
 

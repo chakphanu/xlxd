@@ -68,6 +68,8 @@ public:
     CDvFramePacket(const uint8 *codec2, uint16 sid, uint8 pid);
     // P25 constructor
     CDvFramePacket(uint16 sid, const uint8 *imbe);
+    // PCM ingress starts with undefined wire packet IDs for stream assignment.
+    CDvFramePacket(uint16 sid,const uint8 *pcm,uint32 origin);
     CDvFramePacket(const CDvFramePacket &);
     
     // destructor
@@ -108,13 +110,14 @@ public:
     bool HasCodec2Data(void) const          { return m_bHasCodec2; }
     bool HasImbeData(void) const            { return m_bHasImbe; }
     bool HasPcmData(void) const             { return bool(m_Pcm); }
-    const uint8 *GetPcm(void) const         { return m_Pcm ? m_Pcm->data() : NULL; }
+    const uint8 *GetPcm(void) const         { return m_Pcm ? m_Pcm->samples.data() : NULL; }
+    uint32 GetPcmOrigin(void) const         { return m_Pcm ? m_Pcm->origin : 0; }
 
     // set
     void SetDvData(uint8 *);
     void SetAmbe(uint8, uint8 *);
     void SetCodec2(const uint8 *);
-    bool SetPcm(const uint8 *,size_t length=320);
+    bool SetPcm(const uint8 *,size_t length=320,uint32 origin=0);
 
     // Reconcile the four Has-flags to reflect what the source actually
     // provides. mask is a bitmask of (1U << CODEC_*) values from the
@@ -156,7 +159,13 @@ protected:
     uint8       m_uiImbe[IMBE_SIZE];
     bool        m_bHasImbe;
     // Allocated only for PCM-bearing packets; published samples are immutable.
-    std::shared_ptr<const std::array<uint8,320> > m_Pcm;
+    struct PcmData {
+        std::array<uint8,320> samples;
+        uint32 origin;
+        bool operator==(const PcmData &other) const
+        { return samples==other.samples && origin==other.origin; }
+    };
+    std::shared_ptr<const PcmData> m_Pcm;
 };
 
 

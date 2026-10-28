@@ -23,6 +23,7 @@
 // ----------------------------------------------------------------------------
 
 #include "main.h"
+#include "cpcmroute.h"
 #include <string.h>
 #include "cxlxpeer.h"
 #include "cxlxdmrpeer.h"
@@ -302,6 +303,8 @@ void CXlxProtocol::HandleQueue(void)
                 {
                     if ( !client->IsAMaster() && (client->GetReflectorModule() == packet->GetModuleId()) )
                     {
+                        if(!PcmRouteAllows(*packet,client->GetAvailableCodecs(),
+                            g_Reflector.HasPcmModule(packet->GetModuleId()))) continue;
                         // protocol revision dependent encoding
                         switch ( client->GetProtocolRevision() )
                         {

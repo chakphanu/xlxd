@@ -40,6 +40,7 @@ class CDvLastFramePacket : public CDvFramePacket
 public:
     // constructor
     CDvLastFramePacket();
+    explicit CDvLastFramePacket(uint16 sid);
     CDvLastFramePacket(const struct dstar_dvframe *, uint16, uint8);
     CDvLastFramePacket(const uint8 *, const uint8 *, uint16, uint8, uint8);
     CDvLastFramePacket(const uint8 *, uint16, uint8, uint8, uint8);

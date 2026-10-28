@@ -36,6 +36,10 @@
 #include "cnxdnprotocol.h"
 #include "cp25protocol.h"
 #include "cprotocols.h"
+#include "cusrpprotocol.h"
+#include <fstream>
+#include <sys/stat.h>
+#include <cerrno>
 
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -132,6 +136,26 @@ bool CProtocols::Init(void)
         delete m_Protocols[11];
         m_Protocols[11] = new CP25Protocol;
         ok &= m_Protocols[11]->Init();
+
+        struct stat info;
+        if(stat(USRPOPTIONS_PATH,&info)==0) {
+            std::ifstream file(USRPOPTIONS_PATH);
+            std::vector<usrp::EndpointConfig> config;
+            std::string error;
+            if(!file || !usrp::parseConfig(file,config,error)) {
+                std::cerr << "Cannot load xlxd.usrp: " << error << std::endl;
+                ok=false;
+            } else if(!config.empty()) {
+                for(const auto &endpoint:config) m_PcmModules|=1U<<(endpoint.module-'A');
+                delete m_Protocols[NB_OF_PROTOCOLS];
+                m_Protocols[NB_OF_PROTOCOLS]=new CUsrpProtocol(config);
+                m_Count=NB_OF_PROTOCOLS+1;
+                ok &= m_Protocols[NB_OF_PROTOCOLS]->Init();
+            }
+        } else if(errno!=ENOENT) {
+            std::cerr << "Cannot inspect xlxd.usrp" << std::endl;
+            ok=false;
+        }
     }
     m_Mutex.unlock();
    
@@ -143,7 +167,7 @@ void CProtocols::Close(void)
 {
     m_Mutex.lock();
     {
-        for ( int i = 0; i < m_Protocols.size(); i++ )
+        for ( int i = 0; i < m_Count; i++ )
         {
             m_Protocols[i]->Close();
         }

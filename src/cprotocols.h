@@ -49,13 +49,17 @@ public:
     void Close(void);
     
     // get
-    int Size(void) const            { return (int)m_Protocols.size(); }
+    int Size(void) const            { return m_Count; }
     CProtocol *GetProtocol(int i)   { return m_Protocols[i]; }
+    bool HasPcmModule(char module) const
+    { return module>='A' && module<='Z' && (m_PcmModules & (1U<<(module-'A'))) != 0; }
     
 protected:
     // data
     std::mutex                                m_Mutex;
-    std::array<CProtocol *, NB_OF_PROTOCOLS>  m_Protocols;
+    std::array<CProtocol *, NB_OF_PROTOCOLS+1>  m_Protocols;
+    int m_Count=NB_OF_PROTOCOLS;
+    uint32 m_PcmModules=0;
 };
 
 

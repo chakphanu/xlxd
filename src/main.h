@@ -98,6 +98,7 @@ static_assert(DSCP_VALUE >= 0 && DSCP_VALUE <= 63,
 #define PROTOCOL_M17                    10
 #define PROTOCOL_NXDN                   11
 #define PROTOCOL_P25                    12
+#define PROTOCOL_USRP                   13
 
 // DExtra - timing matched to ircDDBGateway (10s poll, 60s timeout)
 #define DEXTRA_PORT                     30001                               // UDP port
@@ -244,6 +245,7 @@ static_assert(DSCP_VALUE >= 0 && DSCP_VALUE <= 63,
 #define BLACKLIST_PATH                  "/xlxd/xlxd.blacklist"
 #define INTERLINKLIST_PATH              "/xlxd/xlxd.interlink"
 #define TERMINALOPTIONS_PATH            "/xlxd/xlxd.terminal"
+#define USRPOPTIONS_PATH                "/xlxd/xlxd.usrp"
 #define DEBUGDUMP_PATH                  "/var/log/xlxd.debug"
 
 // system constants ---------------------------------------------

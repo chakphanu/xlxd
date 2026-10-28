@@ -23,6 +23,7 @@
 // ----------------------------------------------------------------------------
 
 #include "main.h"
+#include "cpcmroute.h"
 #include <string.h>
 #include "creflector.h"
 #include "cgatekeeper.h"
@@ -335,7 +336,8 @@ CPacketStream *CReflector::OpenStream(CDvHeaderPacket *DvHeader, CClient *client
         if ( missing != 0U )
         {
             // Pick the preferred source codec from what's available.
-            if      ( transcodeSourceCodecs & (1U << CODEC_AMBE2PLUS) ) transcodeInputCodec = CODEC_AMBE2PLUS;
+            if      ( transcodeSourceCodecs & (1U << CODEC_PCM_S16LE_8K) ) transcodeInputCodec = CODEC_PCM_S16LE_8K;
+            else if ( transcodeSourceCodecs & (1U << CODEC_AMBE2PLUS) ) transcodeInputCodec = CODEC_AMBE2PLUS;
             else if ( transcodeSourceCodecs & (1U << CODEC_AMBEPLUS)  ) transcodeInputCodec = CODEC_AMBEPLUS;
             else if ( transcodeSourceCodecs & (1U << CODEC_CODEC2)    ) transcodeInputCodec = CODEC_CODEC2;
             else if ( transcodeSourceCodecs & (1U << CODEC_IMBE)      ) transcodeInputCodec = CODEC_IMBE;
@@ -347,7 +349,8 @@ CPacketStream *CReflector::OpenStream(CDvHeaderPacket *DvHeader, CClient *client
     // AMBE+/AMBE+2 baseline, but defence-in-depth), keep the prior
     // behaviour of engaging the transcoder with the native codec.
     // Avoids any chance of regression for paths that worked before.
-    if ( transcodeInputCodec == CODEC_NONE && inputCodec != CODEC_NONE )
+    const bool pcmModule=(neededCodecs & (1U<<CODEC_PCM_S16LE_8K))!=0;
+    if ( !pcmModule && transcodeInputCodec == CODEC_NONE && inputCodec != CODEC_NONE )
     {
         transcodeInputCodec = inputCodec;
     }
@@ -355,14 +358,16 @@ CPacketStream *CReflector::OpenStream(CDvHeaderPacket *DvHeader, CClient *client
     CCodecStream *codecStream = NULL;
     if ( transcodeInputCodec != CODEC_NONE )
     {
-        codecStream = g_Transcoder.GetStream(stream, transcodeInputCodec);
+        codecStream = pcmModule ?
+            g_Transcoder.GetStream(stream,transcodeInputCodec,neededCodecs & ~transcodeSourceCodecs) :
+            g_Transcoder.GetStream(stream, transcodeInputCodec);
     }
 
     // ----- Phase 3: attach the codec stream (stream lock only) -----
     // AttachCodecStream handles the case where CloseStream fired during
     // Phase 2 (it releases the codec stream and drops buffered frames).
     stream->Lock();
-    stream->AttachCodecStream(codecStream);
+    stream->AttachCodecStream(codecStream,transcodeInputCodec!=CODEC_NONE);
     stream->Unlock();
 
     // Re-acquire Clients for the caller. The `client` parameter may now be
@@ -781,6 +786,10 @@ void CReflector::RouterThread(CReflector *This, CPacketStream *streamIn)
             // iterate on all protocols
             for ( int i = 0; i < This->m_Protocols.Size(); i++ )
             {
+                // XLX requirements are checked per peer in its handler.
+                static const uint8 pcmEgressCodecs[NB_OF_PROTOCOLS+1]={1,1,1,0,2,2,2,1,2,3,2,4,5};
+                const uint8 codec=pcmEgressCodecs[i];
+                if(!PcmRouteAllows(*packet,codec ? (1U<<codec) : 0U,This->HasPcmModule(uiModuleId))) continue;
                 // duplicate packet
                 CPacket *packetClone = packet->Duplicate();
 
@@ -1046,6 +1055,8 @@ CPacketStream *CReflector::GetStream(char module)
 // silence on a needed-but-not-decided codec until the next TX.
 uint32 CReflector::GetNeededCodecsOnModule(char module) const
 {
+    uint32 actual=0;
+    bool pcmModule=false;
     uint32 needed = (1U << CODEC_AMBEPLUS) | (1U << CODEC_AMBE2PLUS);
 
     for ( int i = 0; i < m_Clients.GetSize(); i++ )
@@ -1060,6 +1071,8 @@ uint32 CReflector::GetNeededCodecsOnModule(char module) const
             continue;
         if ( cl->GetReflectorModule() != module )
             continue;
+        actual|=cl->GetAvailableCodecs();
+        pcmModule|=cl->GetProtocol()==PROTOCOL_USRP;
         switch ( cl->GetProtocol() )
         {
             case PROTOCOL_M17:
@@ -1075,7 +1088,7 @@ uint32 CReflector::GetNeededCodecsOnModule(char module) const
                 break;
         }
     }
-    return needed;
+    return pcmModule ? actual : needed;
 }
 
 void CReflector::ReleaseStreamOwner(CClient *client)

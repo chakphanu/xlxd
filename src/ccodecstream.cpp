@@ -819,6 +819,7 @@ void CCodecStream::Task(void)
             size_t ratioPkts = overrunRatioMs / JITTER_BUFFER_FRAME_MS;
             size_t additivePkts = targetPkts + JITTER_OVERRUN_BURST_HEADROOM;
             size_t overrunThreshold = std::max<size_t>(ratioPkts, additivePkts);
+            if(IsExtended()) overrunThreshold=std::max(overrunThreshold,m_ExtendedStartupFloor);
             // Belt-and-braces: if anyone ever lowers MIN_JITTER_DELAY_MS
             // below FRAME_MS, the ratio path floors to zero. The
             // additive path's +HEADROOM keeps overall threshold above
@@ -923,6 +924,10 @@ void CCodecStream::Task(void)
         // and overrun protection becomes meaningful.
         if ( !m_bFirstReleaseDone && !toRelease.empty() )
         {
+            // Keep the accepted open backlog when the adaptive target shrinks.
+            // Two slots cover one arrival tick and the terminal marker.
+            if(IsExtended()) m_ExtendedStartupFloor=std::min<size_t>(
+                800/JITTER_BUFFER_FRAME_MS,size_t(m_uiPeakBufferOccupancy)+2);
             m_bFirstReleaseDone = true;
         }
     }

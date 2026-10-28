@@ -33,6 +33,11 @@ CDvLastFramePacket::CDvLastFramePacket()
 {
 }
 
+CDvLastFramePacket::CDvLastFramePacket(uint16 sid)
+    :CDvFramePacket(sid,NULL,uint32(0))
+{
+}
+
 // dstar constructor
 
 CDvLastFramePacket::CDvLastFramePacket(const struct dstar_dvframe *DvFrame, uint16 sid, uint8 pid)
